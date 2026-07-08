@@ -12,22 +12,31 @@ interface UseExpenseFormProps {
 }
 
 export function useExpenseForm({ initialData, onSubmit }: UseExpenseFormProps) {
+  const today = formatDate(new Date());
   const [formData, setFormData] = useState<ExpenseFormData>({
     amount: initialData?.amount || "",
     description: initialData?.description || "",
     category: initialData?.category || "",
-    date: initialData?.date || formatDate(new Date()),
+    date: initialData?.date || today,
   });
 
   const [errors, setErrors] = useState<Partial<ExpenseFormData>>({});
+  const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field: keyof ExpenseFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    setFormError("");
+
+    if (field === "date" && value > today) {
+      setErrors((prev) => ({
+        ...prev,
+        date: "Expense date cannot be in the future",
+      }));
+      return;
     }
+
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
   const validateForm = (): boolean => {
@@ -47,6 +56,8 @@ export function useExpenseForm({ initialData, onSubmit }: UseExpenseFormProps) {
 
     if (!formData.date) {
       newErrors.date = "Date is required";
+    } else if (formData.date > today) {
+      newErrors.date = "Expense date cannot be in the future";
     }
 
     setErrors(newErrors);
@@ -68,11 +79,20 @@ export function useExpenseForm({ initialData, onSubmit }: UseExpenseFormProps) {
         amount: "",
         description: "",
         category: "",
-        date: formatDate(new Date()),
+        date: today,
       });
       setErrors({});
+      setFormError("");
     } catch (error) {
       console.error("Form submission error:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to submit expense";
+
+      if (message.toLowerCase().includes("date")) {
+        setErrors((prev) => ({ ...prev, date: message }));
+      } else {
+        setFormError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -83,14 +103,17 @@ export function useExpenseForm({ initialData, onSubmit }: UseExpenseFormProps) {
       amount: initialData?.amount || "",
       description: initialData?.description || "",
       category: initialData?.category || "",
-      date: initialData?.date || formatDate(new Date()),
+      date: initialData?.date || today,
     });
     setErrors({});
+    setFormError("");
   };
 
   return {
     formData,
     errors,
+    formError,
+    today,
     isSubmitting,
     handleChange,
     handleSubmit,

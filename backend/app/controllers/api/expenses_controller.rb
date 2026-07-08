@@ -44,7 +44,13 @@ class Api::ExpensesController < ApplicationController
   private
 
   def expense_params
-    params.require(:expense).permit(:description, :amount, :category_id, :date)
+    permitted = params.require(:expense).permit(:description, :amount, :category_id, :category, :date)
+
+    if permitted[:category].present? && permitted[:category_id].blank?
+      permitted[:category_id] = Category.find_by(name: permitted[:category])&.id
+    end
+
+    permitted.except(:category)
   end
 
   def format_expense(expense)

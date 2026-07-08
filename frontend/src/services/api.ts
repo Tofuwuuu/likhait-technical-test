@@ -6,11 +6,40 @@ import { Expense, ExpenseFormData } from "../types";
 
 const API_BASE_URL = "http://localhost:3000/api";
 
+async function apiFetch(
+  url: string,
+  options?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch {
+    throw new Error(
+      "Unable to reach the API. Make sure the backend is running at http://localhost:3000.",
+    );
+  }
+}
+
+async function getErrorMessage(
+  response: Response,
+  fallbackMessage: string,
+): Promise<string> {
+  try {
+    const body = await response.json();
+    if (Array.isArray(body.errors) && body.errors.length > 0) {
+      return body.errors.join(", ");
+    }
+  } catch {
+    // Fall back to the caller's generic message when the API returns no JSON.
+  }
+
+  return fallbackMessage;
+}
+
 /**
  * Fetch all expenses
  */
 export async function fetchExpenses(): Promise<Expense[]> {
-  const response = await fetch(`${API_BASE_URL}/expenses`);
+  const response = await apiFetch(`${API_BASE_URL}/expenses`);
   if (!response.ok) {
     throw new Error("Failed to fetch expenses");
   }
@@ -24,7 +53,7 @@ export async function getExpenses(
   year: number,
   month: number,
 ): Promise<Expense[]> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/expenses?year=${year}&month=${month}`,
   );
   if (!response.ok) {
@@ -39,7 +68,7 @@ export async function getExpenses(
 export async function fetchCategories(): Promise<
   Array<{ id: number; name: string }>
 > {
-  const response = await fetch(`${API_BASE_URL}/categories`);
+  const response = await apiFetch(`${API_BASE_URL}/categories`);
   if (!response.ok) {
     throw new Error("Failed to fetch categories");
   }
@@ -50,18 +79,14 @@ export async function fetchCategories(): Promise<
  * Create a new expense
  */
 export async function createExpense(data: ExpenseFormData): Promise<Expense> {
-  // Convert category name to category_id
-  const categories = await fetchCategories();
-  const category = categories.find((c) => c.name === data.category);
-
   const expenseData = {
     description: data.description,
     amount: data.amount,
-    category_id: category?.id,
+    category: data.category,
     date: data.date,
   };
 
-  const response = await fetch(`${API_BASE_URL}/expenses`, {
+  const response = await apiFetch(`${API_BASE_URL}/expenses`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -70,7 +95,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create expense");
+    throw new Error(await getErrorMessage(response, "Failed to create expense"));
   }
 
   return response.json();
@@ -83,7 +108,7 @@ export async function updateExpense(
   id: number,
   data: Partial<ExpenseFormData>,
 ): Promise<Expense> {
-  const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
+  const response = await apiFetch(`${API_BASE_URL}/expenses/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -92,7 +117,7 @@ export async function updateExpense(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to update expense");
+    throw new Error(await getErrorMessage(response, "Failed to update expense"));
   }
 
   return response.json();
@@ -102,7 +127,7 @@ export async function updateExpense(
  * Delete an expense
  */
 export async function deleteExpense(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
+  const response = await apiFetch(`${API_BASE_URL}/expenses/${id}`, {
     method: "DELETE",
   });
 
