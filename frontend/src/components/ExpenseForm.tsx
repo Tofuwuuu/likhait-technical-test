@@ -2,11 +2,13 @@
  * Form component for adding/editing expenses
  */
 
-import React from "react";
-import { ExpenseFormData } from "../types";
-import { EXPENSE_CATEGORIES } from "../constants/categories";
-import { TextField, SelectBox, Button } from "../vibes";
+import React, { useEffect, useState } from "react";
+import { Category, CategoryFormData, ExpenseFormData } from "../types";
+import { TextField, SelectBox, Button, Modal } from "../vibes";
 import { useExpenseForm } from "../hooks/useExpenseForm";
+import { fetchCategories, createCategory } from "../services/api";
+import { COLORS } from "../constants/colors";
+import { CategoryForm } from "./CategoryForm";
 
 interface ExpenseFormProps {
   initialData?: Partial<ExpenseFormData>;
@@ -27,6 +29,31 @@ export function ExpenseForm({
       onSubmit,
     });
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
+
+  const handleAddCategory = async (data: CategoryFormData) => {
+    const newCategory = await createCategory(data);
+    setCategories((prev) =>
+      [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    handleChange("category", newCategory.name);
+    setIsCategoryModalOpen(false);
+  };
+
   const formStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -39,76 +66,115 @@ export function ExpenseForm({
     marginTop: "0.5rem",
   };
 
-  const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
-    value: category,
-    label: category,
+  const categoryFieldStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "0.5rem",
+  };
+
+  const addCategoryLinkStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    padding: "0.5rem 0",
+    color: COLORS.primary.p06,
+    fontSize: "0.875rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+
+  const categoryOptions = categories.map((category) => ({
+    value: category.name,
+    label: category.emoji ? `${category.emoji} ${category.name}` : category.name,
   }));
 
   return (
-    <form onSubmit={handleSubmit} style={formStyle}>
-      <TextField
-        label="Amount"
-        type="number"
-        step="0.01"
-        placeholder="0.00"
-        value={formData.amount}
-        onChange={(e) => handleChange("amount", e.target.value)}
-        error={errors.amount}
-        fullWidth
-        required
-      />
-
-      <TextField
-        label="Description"
-        type="text"
-        placeholder="Enter description"
-        value={formData.description}
-        onChange={(e) => handleChange("description", e.target.value)}
-        error={errors.description}
-        fullWidth
-        required
-      />
-
-      <SelectBox
-        label="Category"
-        options={categoryOptions}
-        value={formData.category}
-        onChange={(e) => handleChange("category", e.target.value)}
-        error={errors.category}
-        fullWidth
-        required
-      />
-
-      <TextField
-        label="Date"
-        type="date"
-        value={formData.date}
-        onChange={(e) => handleChange("date", e.target.value)}
-        error={errors.date}
-        fullWidth
-        required
-      />
-
-      <div style={buttonGroupStyle}>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={isSubmitting}
+    <>
+      <form onSubmit={handleSubmit} style={formStyle}>
+        <TextField
+          label="Amount"
+          type="number"
+          step="0.01"
+          placeholder="0.00"
+          value={formData.amount}
+          onChange={(e) => handleChange("amount", e.target.value)}
+          error={errors.amount}
           fullWidth
-        >
-          {isSubmitting ? "Submitting..." : submitLabel}
-        </Button>
-        {onCancel && (
-          <Button
+          required
+        />
+
+        <TextField
+          label="Description"
+          type="text"
+          placeholder="Enter description"
+          value={formData.description}
+          onChange={(e) => handleChange("description", e.target.value)}
+          error={errors.description}
+          fullWidth
+          required
+        />
+
+        <div style={categoryFieldStyle}>
+          <SelectBox
+            label="Category"
+            options={categoryOptions}
+            value={formData.category}
+            onChange={(e) => handleChange("category", e.target.value)}
+            error={errors.category}
+            fullWidth
+            required
+          />
+          <button
             type="button"
-            variant="secondary"
-            onClick={onCancel}
-            disabled={isSubmitting}
+            style={addCategoryLinkStyle}
+            onClick={() => setIsCategoryModalOpen(true)}
           >
-            Cancel
+            + Add Category
+          </button>
+        </div>
+
+        <TextField
+          label="Date"
+          type="date"
+          value={formData.date}
+          onChange={(e) => handleChange("date", e.target.value)}
+          error={errors.date}
+          fullWidth
+          required
+        />
+
+        <div style={buttonGroupStyle}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting}
+            fullWidth
+          >
+            {isSubmitting ? "Submitting..." : submitLabel}
           </Button>
-        )}
-      </div>
-    </form>
+          {onCancel && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onCancel}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+      </form>
+
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title="Add New Category"
+      >
+        <CategoryForm
+          onSubmit={handleAddCategory}
+          onCancel={() => setIsCategoryModalOpen(false)}
+        />
+      </Modal>
+    </>
   );
 }
