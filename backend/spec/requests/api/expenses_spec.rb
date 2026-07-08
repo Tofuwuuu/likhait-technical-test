@@ -46,11 +46,30 @@ RSpec.describe "Api::Expenses", type: :request do
         expect(response).to have_http_status(:created)
         json = JSON.parse(response.body)
         expect(json["description"]).to eq("Team Lunch")
-        expect(json["amount"]).to eq("150.5")
+        expect(json["amount"]).to eq(150.5)
       end
     end
 
     context "with invalid parameters" do
+      it "rejects future dates" do
+        invalid_params = {
+          expense: {
+            description: "Future expense",
+            amount: 100.00,
+            category_id: food_category.id,
+            date: Date.tomorrow
+          }
+        }
+
+        expect {
+          post "/api/expenses", params: invalid_params, as: :json
+        }.not_to change(Expense, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        json = JSON.parse(response.body)
+        expect(json["errors"]).to include("Expense date cannot be in the future")
+      end
+
       it "with negative amounts" do
         invalid_params = {
           expense: {
@@ -84,6 +103,28 @@ RSpec.describe "Api::Expenses", type: :request do
 
         expect(response).to have_http_status(:created)
       end
+    end
+  end
+
+  describe "PUT /api/expenses/:id" do
+    let!(:expense) do
+      Expense.create!(
+        description: "Lunch",
+        amount: 100.00,
+        category: food_category,
+        date: Date.current
+      )
+    end
+
+    it "rejects future dates" do
+      put "/api/expenses/#{expense.id}",
+        params: { expense: { date: Date.tomorrow } },
+        as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      json = JSON.parse(response.body)
+      expect(json["errors"]).to include("Expense date cannot be in the future")
+      expect(expense.reload.date).to eq(Date.current)
     end
   end
 end
