@@ -47,7 +47,7 @@ Users should be able to create new categories through the UI with the following 
 
 N/A - Feature doesn't exist yet
 
----
+--- 
 
 ## BONUS-001: Prevent Future Date Expense Creation
 
